@@ -1,95 +1,108 @@
-import Image from 'next/image'
+"use client";
+
+import { WhichCelebrityResponse } from "@/types";
+import {  useCallback, useRef, useState  } from "react";
+import Head from 'next/head'
 import styles from './page.module.css'
+import CelebrityResult from "@/components/CelebrityResult";
+import { postWhichCelebrity } from "@/utils/postWhichCelebrity";
+import { CollectorSource } from "clarifai-nodejs-grpc/proto/clarifai/api/resources_pb";
+
+
 
 export default function Home() {
+  const cameraPreviewEl = useRef<HTMLVideoElement>(null);
+  const [capturing, setCapturing] = useState(false);
+  const [snapshot, setSnapshot] = useState<string>();
+  const [response, setResponse] = useState<WhichCelebrityResponse>();
+
+  const beginCapture = useCallback(
+    async () => {
+      if (!cameraPreviewEl.current) {
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      cameraPreviewEl.current.srcObject = stream;
+      cameraPreviewEl.current.play();
+      setCapturing(true);
+    },
+    [cameraPreviewEl],
+  );
+
+  const takeSnapshot = useCallback(
+    () => {
+      if (!cameraPreviewEl.current) {
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 600;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        return;
+      }
+
+      ctx.drawImage(cameraPreviewEl.current, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          return null;
+        }
+
+        if (snapshot) {
+          URL.revokeObjectURL(snapshot);
+        }
+        setSnapshot(URL.createObjectURL(blob));
+
+        const resp = await postWhichCelebrity(blob);
+        setResponse(resp);
+        console.log(resp)
+      });
+    },
+    [snapshot]
+  );
+
   return (
-    <main className={styles.main}>
-      <div className={styles.description}>
-        <p>
-          Get started by editing&nbsp;
-          <code className={styles.code}>app/page.tsx</code>
-        </p>
-        <div>
-          <a
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className={styles.vercelLogo}
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
+    <>
+      <div className={styles.body}>     
+        <Head>
+          <title>Which Celebrity Am I?</title>
+          <meta name="description" content="Use the power of AI to figure out which celebrity you look like!" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <link rel="icon" href="/favicon.ico" />
+        </Head>
+        <main className= {styles.main} >
+          <div className={styles.description}>
+            <h1>Which celebrity
+           do you look like?</h1>
+          </div>
+        </main>
+          <div className={styles.rightSide}>
+          <div className={styles.vidParent}>
+             <video className={styles.video} ref={cameraPreviewEl} />
+             <div className={styles.vidOverlay}></div>
+          </div> 
+            <div className={styles.btns}>
+              <div className={styles.btncom}>
+                <button className={styles.btn} onClick={beginCapture}>Click to start video</button>
+                {capturing &&
+                      (
+                        <button onClick={takeSnapshot} className={styles.snapshot}>
+                          📸
+                        </button>
+                        
+                        
+                      )}
+              </div>  
+                  { snapshot && <CelebrityResult snapshot={snapshot} response={response} />}
+            </div>
+           
+              
+          </div>
+          
+        
       </div>
-
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className={styles.grid}>
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Docs <span>-&gt;</span>
-          </h2>
-          <p>Find in-depth information about Next.js features and API.</p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Learn <span>-&gt;</span>
-          </h2>
-          <p>Learn about Next.js in an interactive course with&nbsp;quizzes!</p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Templates <span>-&gt;</span>
-          </h2>
-          <p>Explore the Next.js 13 playground.</p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Deploy <span>-&gt;</span>
-          </h2>
-          <p>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+    </>
+   
   )
 }
